@@ -49,6 +49,7 @@ def home():
     <h2>Temperature Management System - Cloud API</h2>
     <p>OK. Try <a href="/api/health">/api/health</a></p>
     <p>Try <a href="/api/latest">/api/latest</a></p>
+    <p>Try <a href="/api/history?limit=30">/api/history?limit=30</a></p>
     """
 
 
@@ -84,7 +85,7 @@ def ingest():
     cpu_temp_c = data.get("cpu_temp_c")
     raw_temp_c = data.get("raw_temp_c")
 
-    # NEW: defaults so NOT NULL constraint won't fail
+    # defaults
     target_c = data.get("target_c", 25.0)
     fan_on = bool(data.get("fan_on", False))
 
@@ -128,6 +129,31 @@ def latest():
             return jsonify({"status": "empty", "message": "No readings yet"})
 
         return jsonify(row)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/history")
+def history():
+    try:
+        limit = int(request.args.get("limit", "30"))
+        if limit < 1:
+            limit = 1
+        if limit > 200:
+            limit = 200
+
+        conn = get_db_conn()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT *
+            FROM readings
+            ORDER BY ts DESC
+            LIMIT %s;
+        """, (limit,))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return jsonify(rows)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
