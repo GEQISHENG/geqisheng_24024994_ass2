@@ -2,20 +2,31 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Login</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login - Smart Room Temperature Controller</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <div class="wrap">
-    <h1>SmartTemp Login</h1>
     <div class="card">
+      <h1 style="margin-top:0;">Login</h1>
+      {% if error %}
+        <div style="margin:10px 0; color:#b00020;">{{ error }}</div>
+      {% endif %}
       <form method="post">
-        <div class="controls">
-          <input name="username" placeholder="Username" required />
-          <input name="password" type="password" placeholder="Password" required />
+        <div class="row" style="gap:12px;">
+          <div class="kv" style="flex:1;">
+            <div class="k">Username</div>
+            <input name="username" autocomplete="username" />
+          </div>
+          <div class="kv" style="flex:1;">
+            <div class="k">Password</div>
+            <input name="password" type="password" autocomplete="current-password" />
+          </div>
+        </div>
+        <div style="margin-top:12px;">
           <button type="submit">Login</button>
         </div>
-        {% if error %}<p class="err">{{ error }}</p>{% endif %}
       </form>
     </div>
   </div>
