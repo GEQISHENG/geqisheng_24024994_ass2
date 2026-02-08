@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Smart Room Temperature Controller</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <h1>Smart Room Temperature Controller (Cloud)</h1>
+      <a class="link" href="/logout">Logout</a>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="kv"><div class="k">Temperature (Corrected)</div><div class="v" id="temp">--</div></div>
+        <div class="kv"><div class="k">Humidity</div><div class="v" id="hum">--</div></div>
+        <div class="kv"><div class="k">Pressure</div><div class="v" id="pres">--</div></div>
+      </div>
+      <div class="row">
+        <div class="kv"><div class="k">CPU Temp</div><div class="v" id="cpu">--</div></div>
+        <div class="kv"><div class="k">Raw Temp</div><div class="v" id="raw">--</div></div>
+        <div class="kv"><div class="k">Fan</div><div class="v" id="fan">--</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Recent History (UTC)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th><th>Temp Corr</th><th>Temp Raw</th><th>CPU</th><th>Hum</th><th>Pres</th><th>Target</th><th>Fan</th>
+          </tr>
+        </thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
