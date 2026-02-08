@@ -1,48 +1,90 @@
-async function getStatus() {
-  const r = await fetch("/api/status");
+async function fetchJson(url) {
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error("HTTP " + r.status);
   return await r.json();
 }
-async function getHistory() {
-  const r = await fetch("/api/history");
-  return await r.json();
+
+function fmtNum(x, unit = "") {
+  if (x === null || x === undefined) return "--";
+  const n = Number(x);
+  if (Number.isNaN(n)) return "--";
+  return n.toFixed(1) + unit;
 }
+
+function fmtBool(x) {
+  return x ? "ON" : "OFF";
+}
+
+function fmtTime(ts) {
+  if (!ts) return "--";
+  try {
+    const d = new Date(ts);
+    return d.toISOString().replace("T", " ").replace(".000Z", "Z");
+  } catch {
+    return ts;
+  }
+}
+
 function setText(id, text) {
-  document.getElementById(id).textContent = text;
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
 }
-function renderHistory(rows) {
+
+function renderLatest(item) {
+  if (!item || item.status === "empty") return;
+
+  setText("temp", fmtNum(item.temperature_c, " °C"));
+  setText("hum", fmtNum(item.humidity_pct, " %"));
+  setText("pres", fmtNum(item.pressure_hpa, " hPa"));
+
+  setText("cpu", fmtNum(item.cpu_temp_c, " °C"));
+  setText("raw", fmtNum(item.raw_temp_c, " °C"));
+
+  setText("fan", fmtBool(item.fan_on));
+}
+
+function renderHistory(items) {
   const body = document.getElementById("histBody");
+  if (!body) return;
+
   body.innerHTML = "";
-  const last = rows.slice(-25).reverse();
-  for (const x of last) {
+
+  if (!Array.isArray(items) || items.length === 0) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="8">No data yet</td>`;
+    body.appendChild(tr);
+    return;
+  }
+
+  for (const x of items) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${x.ts}</td>
-      <td>${Number(x.temperature_c).toFixed(2)}</td>
-      <td>${Number(x.raw_temp_c).toFixed(2)}</td>
-      <td>${Number(x.cpu_temp_c).toFixed(2)}</td>
-      <td>${Number(x.humidity_pct).toFixed(2)}</td>
-      <td>${Number(x.pressure_hpa).toFixed(2)}</td>
-      <td>${Number(x.target_c).toFixed(1)}</td>
-      <td>${x.fan_on ? '<span class="badge-on">ON</span>' : '<span class="badge-off">OFF</span>'}</td>
+      <td>${fmtTime(x.ts)}</td>
+      <td>${fmtNum(x.temperature_c)}</td>
+      <td>${fmtNum(x.raw_temp_c)}</td>
+      <td>${fmtNum(x.cpu_temp_c)}</td>
+      <td>${fmtNum(x.humidity_pct)}</td>
+      <td>${fmtNum(x.pressure_hpa)}</td>
+      <td>${fmtNum(x.target_c)}</td>
+      <td>${fmtBool(x.fan_on)}</td>
     `;
     body.appendChild(tr);
   }
 }
-async function tick() {
-  const s = await getStatus();
-  if (!s.ok) return;
-  setText("temp", `${Number(s.temperature_c).toFixed(2)} °C`);
-  setText("hum", `${Number(s.humidity_pct).toFixed(2)} %`);
-  setText("pres", `${Number(s.pressure_hpa).toFixed(2)} hPa`);
-  setText("cpu", `${Number(s.cpu_temp_c).toFixed(2)} °C`);
-  setText("raw", `${Number(s.raw_temp_c).toFixed(2)} °C`);
-  document.getElementById("fan").innerHTML = s.fan_on ? '<span class="badge-on">ON</span>' : '<span class="badge-off">OFF</span>';
+
+async function refresh() {
+  try {
+    const latest = await fetchJson("/api/latest");
+    renderLatest(latest);
+
+    const hist = await fetchJson("/api/history?limit=30");
+    renderHistory(hist);
+  } catch (e) {
+    console.log("refresh error:", e);
+  }
 }
-async function refreshHistory() {
-  const h = await getHistory();
-  renderHistory(h);
-}
-tick();
-refreshHistory();
-setInterval(tick, 2000);
-setInterval(refreshHistory, 6000);
+
+document.addEventListener("DOMContentLoaded", () => {
+  refresh();
+  setInterval(refresh, 5000);
+});
