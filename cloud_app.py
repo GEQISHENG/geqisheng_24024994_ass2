@@ -1,9 +1,30 @@
 import os
-from flask import Flask, request, jsonify
+from functools import wraps
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import psycopg2
 import psycopg2.extras
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, "templates"),
+    static_folder=os.path.join(BASE_DIR, "static")
+)
+
+# Login config (set these in Render Environment)
+app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")
+APP_USER = os.environ.get("APP_USER", "geqisheng")
+APP_PASS = os.environ.get("APP_PASS", "gqs123")
+
+
+def login_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login", next=request.path))
+        return fn(*args, **kwargs)
+    return wrapper
 
 
 def get_db_conn():
@@ -35,6 +56,7 @@ def init_db():
     conn.close()
 
 
+# Ensure table exists under gunicorn on Render
 try:
     if os.environ.get("DATABASE_URL", ""):
         init_db()
@@ -42,29 +64,60 @@ except Exception as e:
     print("init_db failed:", e)
 
 
-@app.route("/")
-def home():
-    return """
-    <h2>Temperature Management System - Cloud API</h2>
-    <p>OK. Try <a href="/api/health">/api/health</a></p>
-    <p>Try <a href="/api/latest">/api/latest</a></p>
-    <p>Try <a href="/api/history?limit=30">/api/history?limit=30</a></p>
-    """
+# ------------------------
+# Auth pages
+# ------------------------
+@app.get("/login")
+def login():
+    if session.get("logged_in"):
+        return redirect(url_for("dashboard"))
+    return render_template("login.html", error=None)
 
 
-@app.route("/api/health")
+@app.post("/login")
+def login_post():
+    username = (request.form.get("username") or "").strip()
+    password = (request.form.get("password") or "").strip()
+
+    if username == APP_USER and password == APP_PASS:
+        session["logged_in"] = True
+        nxt = request.args.get("next") or "/"
+        return redirect(nxt)
+
+    return render_template("login.html", error="Invalid username or password.")
+
+
+@app.get("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+# ------------------------
+# Dashboard (protected)
+# ------------------------
+@app.get("/")
+@login_required
+def dashboard():
+    return render_template("index.html")
+
+
+# ------------------------
+# APIs
+# ------------------------
+@app.get("/api/health")
 def health():
     return jsonify({"status": "ok"})
 
 
-@app.route("/api/ingest", methods=["POST"])
+# ingest is for Raspberry Pi uploader (API key protected, not login)
+@app.post("/api/ingest")
 def ingest():
     api_key = os.environ.get("CLOUD_API_KEY", "")
     client_key = request.headers.get("X-API-KEY", "")
 
     if not api_key:
         return jsonify({"error": "CLOUD_API_KEY not set on server"}), 500
-
     if client_key != api_key:
         return jsonify({"error": "Unauthorized"}), 401
 
@@ -74,7 +127,6 @@ def ingest():
 
     device_id = data.get("device_id")
     ts = data.get("ts")
-
     if not device_id or not ts:
         return jsonify({"error": "device_id and ts are required"}), 400
 
@@ -108,7 +160,9 @@ def ingest():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/latest")
+# latest/history should be protected because the webpage uses them
+@app.get("/api/latest")
+@login_required
 def latest():
     try:
         conn = get_db_conn()
@@ -125,13 +179,13 @@ def latest():
 
         if not row:
             return jsonify({"status": "empty", "message": "No readings yet"})
-
         return jsonify(row)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/history")
+@app.get("/api/history")
+@login_required
 def history():
     try:
         limit = int(request.args.get("limit", "30"))
