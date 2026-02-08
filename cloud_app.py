@@ -35,7 +35,6 @@ def init_db():
     conn.close()
 
 
-# IMPORTANT: ensure DB/table exists under gunicorn on Render
 try:
     if os.environ.get("DATABASE_URL", ""):
         init_db()
@@ -85,7 +84,6 @@ def ingest():
     cpu_temp_c = data.get("cpu_temp_c")
     raw_temp_c = data.get("raw_temp_c")
 
-    # defaults
     target_c = data.get("target_c", 25.0)
     fan_on = bool(data.get("fan_on", False))
 
@@ -118,7 +116,7 @@ def latest():
         cur.execute("""
             SELECT *
             FROM readings
-            ORDER BY ts DESC
+            ORDER BY id DESC
             LIMIT 1;
         """)
         row = cur.fetchone()
@@ -147,7 +145,7 @@ def history():
         cur.execute("""
             SELECT *
             FROM readings
-            ORDER BY ts DESC
+            ORDER BY id DESC
             LIMIT %s;
         """, (limit,))
         rows = cur.fetchall()
